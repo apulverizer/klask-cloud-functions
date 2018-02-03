@@ -5,9 +5,7 @@ const functions = require('firebase-functions');
 const admin = require('firebase-admin');
 admin.initializeApp(functions.config().firebase);
 
-// // Create and Deploy Your First Cloud Functions
-// // https://firebase.google.com/docs/functions/write-firebase-functions
-//
+// get all games
 exports.games = functions.https.onRequest((request, response) => {
   var db = admin.database();
   var ref = db.ref("games");
@@ -22,6 +20,7 @@ exports.games = functions.https.onRequest((request, response) => {
   });
 });
 
+// get all challenges
 exports.challenges = functions.https.onRequest((request, response) => {
   var db = admin.database();
   var ref = db.ref("challenges");
@@ -35,6 +34,7 @@ exports.challenges = functions.https.onRequest((request, response) => {
   });
 });
 
+// get standings
 exports.standings = functions.https.onRequest((request, response) => {
   var db = admin.database();
   var arenaid = request.query.arenaid;
@@ -44,60 +44,56 @@ exports.standings = functions.https.onRequest((request, response) => {
     return response.send({"error": "You must specify an arena"})
   }
 
-  return admin.database().ref('games').orderByChild('arenaid').equalTo(arenaid).once('value', (snapshot) => {
-    var games = snapshot.val() || {};
+  // get users, then filter by arena
+  return admin.database().ref('users').once('value', (snapshot) => {
+    var fullusers = snapshot.val() || {};
     var users = {};
-    Object.keys(games).forEach(key => {
-      var game = games[key];
-      if (!users.hasOwnProperty(game.player1id)){
-        users[game.player1id] = {
-          uid: game.player1id,
-          games: 0,
-          wins: 0,
-          loses: 0,
-          percentage: 0,
-          goalsFor: 0,
-          goalsAgainst: 0,
-        }
+    Object.keys(fullusers).forEach(uid => {
+      let user = fullusers[uid];
+      let joinedArenas = user.arenasjoined || [];
+      if (joinedArenas.indexOf(arenaid) != -1){
+        users[uid] = user;
+        // add extra properties to user
+        users[uid].games = 0;
+        users[uid].wins = 0;
+        users[uid].loses = 0;
+        users[uid].percentage = 0;
+        users[uid].goalsFor = 0;
+        users[uid].goalsAgainst = 0;
       }
-      if (!users.hasOwnProperty(game.player2id)){
-        users[game.player2id] = {
-          uid: game.player2id,
-          games: 0,
-          wins: 0,
-          loses: 0,
-          percentage: 0,
-          goalsFor: 0,
-          goalsAgainst: 0,
-        }
-      }
-      // update games
-      users[game.player1id].games += 1;
-      users[game.player2id].games += 1;
-      // update win/loss
-      if (game.player1score > game.player2score){
-        users[game.player1id].wins += 1;
-        users[game.player2id].loses += 1;
-      }
-      else {
-        users[game.player2id].wins += 1;
-        users[game.player1id].loses += 1;
-      }
-      // update goals
-      users[game.player1id].goalsFor += game.player1score;
-      users[game.player1id].goalsAgainst += game.player2score;
-      users[game.player2id].goalsFor += game.player2score;
-      users[game.player2id].goalsAgainst += game.player1score;
     });
-    let usersRanked = [];
-    // push the users into a list
-    Object.keys(users).forEach(uid => {
-      let user = users[uid];
-      user.percentage = (user.wins / (user.games)) || 0;
-      usersRanked.push(user);
-    });
-    // sort the users
-    usersRanked = usersRanked.sort(function(a,b){
+    // now get the games in the arena
+    return admin.database().ref('games').orderByChild('arenaid').equalTo(arenaid).once('value', (snapshot) => {
+      var games = snapshot.val() || {};
+      Object.keys(games).forEach(key => {
+        var game = games[key];
+        // update games
+        users[game.player1id].games += 1;
+        users[game.player2id].games += 1;
+        // update win/loss
+        if (game.player1score > game.player2score){
+          users[game.player1id].wins += 1;
+          users[game.player2id].loses += 1;
+        }
+        else {
+          users[game.player2id].wins += 1;
+          users[game.player1id].loses += 1;
+        }
+        // update goals
+        users[game.player1id].goalsFor += game.player1score;
+        users[game.player1id].goalsAgainst += game.player2score;
+        users[game.player2id].goalsFor += game.player2score;
+        users[game.player2id].goalsAgainst += game.player1score;
+      });
+      let usersRanked = [];
+      // push the users into a list
+      Object.keys(users).forEach(uid => {
+        let user = users[uid];
+        user.percentage = (user.wins / (user.games)) || 0;
+        usersRanked.push(user);
+      });
+      // sort the users
+      usersRanked = usersRanked.sort(function(a,b){
         if (a.percentage > b.percentage) {
           return -1;
         }
@@ -111,8 +107,9 @@ exports.standings = functions.https.onRequest((request, response) => {
           return 1;
         }
         return 0;
+      });
+      return response.send(usersRanked || {});
     });
-    return response.send(usersRanked || {});
   });
 });
 
