@@ -34,3 +34,85 @@ exports.challenges = functions.https.onRequest((request, response) => {
       response.send(snapshot.val() || {});
   });
 });
+
+exports.standings = functions.https.onRequest((request, response) => {
+  var db = admin.database();
+  var arenaid = request.query.arenaid;
+  var joinUser = request.query.joinUser || false;
+
+  if (!arenaid){
+    return response.send({"error": "You must specify an arena"})
+  }
+
+  return admin.database().ref('games').orderByChild('arenaid').equalTo(arenaid).once('value', (snapshot) => {
+    var games = snapshot.val() || {};
+    var users = {};
+    Object.keys(games).forEach(key => {
+      var game = games[key];
+      if (!users.hasOwnProperty(game.player1id)){
+        users[game.player1id] = {
+          uid: game.player1id,
+          games: 0,
+          wins: 0,
+          loses: 0,
+          percentage: 0,
+          goalsFor: 0,
+          goalsAgainst: 0,
+        }
+      }
+      if (!users.hasOwnProperty(game.player2id)){
+        users[game.player2id] = {
+          uid: game.player2id,
+          games: 0,
+          wins: 0,
+          loses: 0,
+          percentage: 0,
+          goalsFor: 0,
+          goalsAgainst: 0,
+        }
+      }
+      // update games
+      users[game.player1id].games += 1;
+      users[game.player2id].games += 1;
+      // update win/loss
+      if (game.player1score > game.player2score){
+        users[game.player1id].wins += 1;
+        users[game.player2id].loses += 1;
+      }
+      else {
+        users[game.player2id].wins += 1;
+        users[game.player1id].loses += 1;
+      }
+      // update goals
+      users[game.player1id].goalsFor += game.player1score;
+      users[game.player1id].goalsAgainst += game.player2score;
+      users[game.player2id].goalsFor += game.player2score;
+      users[game.player2id].goalsAgainst += game.player1score;
+    });
+    let usersRanked = [];
+    // push the users into a list
+    Object.keys(users).forEach(uid => {
+      let user = users[uid];
+      user.percentage = (user.wins / (user.games)) || 0;
+      usersRanked.push(user);
+    });
+    // sort the users
+    usersRanked = usersRanked.sort(function(a,b){
+        if (a.percentage > b.percentage) {
+          return -1;
+        }
+        if (a.percentage < b.percentage) {
+          return 1;
+        }
+        if (a.wins > b.wins){
+          return -1;
+        }
+        if (b.wins > a.wins){
+          return 1;
+        }
+        return 0;
+    });
+    return response.send(usersRanked || {});
+  });
+});
+
