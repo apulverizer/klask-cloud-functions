@@ -51,7 +51,7 @@ exports.standings = functions.https.onRequest((request, response) => {
     Object.keys(fullusers).forEach(uid => {
       let user = fullusers[uid];
       let joinedArenas = user.arenasjoined || [];
-      if (joinedArenas.indexOf(arenaid) != -1){
+      if (joinedArenas.indexOf(arenaid) !== -1){
         users[uid] = user;
         // add extra properties to user
         users[uid].games = 0;
