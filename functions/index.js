@@ -7,6 +7,9 @@ admin.initializeApp(functions.config().firebase);
 
 // get all games
 exports.games = functions.https.onRequest((request, response) => {
+  if (!request.query.token){
+    return response.send({"error": "You must supply an authentication token"})
+  }
   return admin.auth().verifyIdToken(request.query.token).then(function(){
     var db = admin.database();
     var ref = db.ref("games");
@@ -26,6 +29,9 @@ exports.games = functions.https.onRequest((request, response) => {
 
 // get all challenges
 exports.challenges = functions.https.onRequest((request, response) => {
+  if (!request.query.token){
+    return response.send({"error": "You must supply an authentication token"})
+  }
   return admin.auth().verifyIdToken(request.query.token).then(function(){
     var db = admin.database();
     var ref = db.ref("challenges");
@@ -44,6 +50,9 @@ exports.challenges = functions.https.onRequest((request, response) => {
 
 // get standings
 exports.standings = functions.https.onRequest((request, response) => {
+  if (!request.query.token){
+    return response.send({"error": "You must supply an authentication token"})
+  }
   return admin.auth().verifyIdToken(request.query.token).then(function(){
     var db = admin.database();
     var arenaid = request.query.arenaid;
